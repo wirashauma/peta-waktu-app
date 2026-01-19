@@ -1,0 +1,147 @@
+// LOKASI: lib/features/auth/services/auth_service.dart
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
+class AuthService {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // ---------------------------------------------------------------------------
+  // 1. SIGN UP EMAIL/PASSWORD (EXISTING)
+  // ---------------------------------------------------------------------------
+  Future<UserCredential> signUp({
+    required String email,
+    required String password,
+    required String nisn,
+    String? nama,
+    String? username,
+  }) async {
+    try {
+      if (email.isEmpty || password.isEmpty || nisn.isEmpty) {
+        throw Exception("Semua kolom harus diisi");
+      }
+
+      UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // Simpan data lengkap ke Firestore
+      await _firestore.collection('users').doc(userCredential.user!.uid).set({
+        'uid': userCredential.user!.uid,
+        'email': email,
+        'nisn': nisn,
+        'nama': nama ?? '',
+        'username': username ?? '',
+        'role': 'user',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      return userCredential;
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2. SIGN IN EMAIL/PASSWORD (EXISTING)
+  // ---------------------------------------------------------------------------
+  Future<UserCredential> signIn({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      if (email.isEmpty || password.isEmpty) {
+        throw Exception("Email dan password harus diisi");
+      }
+      return await _auth.signInWithEmailAndPassword(
+          email: email, password: password);
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. RESET PASSWORD (EXISTING)
+  // ---------------------------------------------------------------------------
+  Future<void> resetPassword({required String email}) async {
+    try {
+      if (email.isEmpty) {
+        throw Exception("Silakan isi email terlebih dahulu.");
+      }
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found') {
+        throw Exception('Email tidak terdaftar.');
+      } else if (e.code == 'invalid-email') {
+        throw Exception('Format email salah.');
+      } else {
+        throw Exception(e.message);
+      }
+    } catch (e) {
+      throw Exception('Gagal mengirim email reset: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 4. GOOGLE LOGIN (NEW)
+  // ---------------------------------------------------------------------------
+  Future<UserCredential> signInWithGoogle() async {
+    try {
+      // Trigger flow autentikasi
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+
+      if (googleUser == null) {
+        throw Exception('Login Google dibatalkan.');
+      }
+
+      // Dapatkan detail auth
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // Buat kredensial baru
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in ke Firebase
+      UserCredential userCredential =
+          await _auth.signInWithCredential(credential);
+
+      // CEK & BUAT DATA DI FIRESTORE JIKA BELUM ADA
+      await _createSocialUserInFirestore(userCredential.user);
+
+      return userCredential;
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // HELPER: BUAT DATA USER SOSIAL (PENTING!)
+  // ---------------------------------------------------------------------------
+  Future<void> _createSocialUserInFirestore(User? user) async {
+    if (user == null) return;
+
+    final userDoc = _firestore.collection('users').doc(user.uid);
+    final snapshot = await userDoc.get();
+
+    // Jika dokumen user belum ada (Login Pertama kali), buatkan defaultnya
+    if (!snapshot.exists) {
+      await userDoc.set({
+        'uid': user.uid,
+        'email': user.email ?? '',
+        'nama': user.displayName ?? 'Pengguna Baru',
+        'username': user.email!.split('@')[0], // Username diambil dari email
+        'nisn': '-', // Default strip karena social login tidak punya NISN
+        'role': 'user',
+        'createdAt': FieldValue.serverTimestamp(),
+        'photoURL': user.photoURL ?? '', // Simpan foto profil Google/FB
+      });
+    }
+  }
+}
