@@ -17,6 +17,7 @@ class AuthService {
     required String nisn,
     String? nama,
     String? username,
+    String role = 'user',
   }) async {
     try {
       if (email.isEmpty || password.isEmpty || nisn.isEmpty) {
@@ -36,7 +37,7 @@ class AuthService {
         'nisn': nisn,
         'nama': nama ?? '',
         'username': username ?? '',
-        'role': 'user',
+        'role': role,
         'createdAt': FieldValue.serverTimestamp(),
       });
 

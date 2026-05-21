@@ -65,6 +65,160 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _handleQuickLogin({
+    required String email,
+    required String password,
+    required String role,
+    required String name,
+  }) async {
+    setState(() => _isLoading = true);
+    try {
+      // 1. Coba login terlebih dahulu
+      await _authService.signIn(email: email, password: password);
+    } catch (e) {
+      // Jika error, kemungkinan besar user belum ada di Auth (belum di-seed)
+      String errorMsg = e.toString().toLowerCase();
+      if (errorMsg.contains('user-not-found') || 
+          errorMsg.contains('invalid-credential') || 
+          errorMsg.contains('wrong-password') ||
+          errorMsg.contains('tidak ditemukan') ||
+          errorMsg.contains('salah')) {
+        // Buat akun baru secara otomatis (Seed Data)
+        try {
+          await _authService.signUp(
+            email: email,
+            password: password,
+            nisn: role == 'user' ? '1234567890' : '-',
+            nama: name,
+            username: name.toLowerCase().replaceAll(' ', ''),
+            role: role,
+          );
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Akun $name berhasil disiapkan & masuk!',
+                  style: GoogleFonts.poppins(fontSize: 12),
+                ),
+                backgroundColor: Colors.green.shade700,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        } catch (signUpErr) {
+          _showError("Gagal menyiapkan akun: $signUpErr");
+        }
+      } else {
+        _showError(e.toString());
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Widget _buildQuickLoginButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required String email,
+    required String password,
+    required String role,
+    required String name,
+  }) {
+    return GestureDetector(
+      onTap: _isLoading
+          ? null
+          : () => _handleQuickLogin(
+                email: email,
+                password: password,
+                role: role,
+                name: name,
+              ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: color.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickLoginSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.bolt, size: 16, color: primaryColor),
+            const SizedBox(width: 6),
+            Text(
+              "Masuk Cepat (Quick Login)",
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: textColor.withOpacity(0.8),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildQuickLoginButton(
+              icon: Icons.admin_panel_settings_outlined,
+              label: 'Admin',
+              color: Colors.red.shade700,
+              email: 'admin@petawaktu.com',
+              password: 'password123',
+              role: 'admin',
+              name: 'Admin Peta Waktu',
+            ),
+            _buildQuickLoginButton(
+              icon: Icons.school_outlined,
+              label: 'Guru',
+              color: Colors.orange.shade800,
+              email: 'guru@petawaktu.com',
+              password: 'password123',
+              role: 'guru',
+              name: 'Guru Sejarah',
+            ),
+            _buildQuickLoginButton(
+              icon: Icons.person_outline,
+              label: 'Siswa',
+              color: primaryColor,
+              email: 'siswa@petawaktu.com',
+              password: 'password123',
+              role: 'user',
+              name: 'Siswa Peta Waktu',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -148,7 +302,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _handleLogin,
                       ),
                     ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+              _buildQuickLoginSection(),
+              const SizedBox(height: 20),
               
               Row(
                 children: [
