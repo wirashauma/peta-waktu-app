@@ -42,6 +42,16 @@ class AuthService {
       });
 
       return userCredential;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'invalid-email') {
+        throw Exception('Format email tidak valid.');
+      } else if (e.code == 'email-already-in-use') {
+        throw Exception('Email sudah terdaftar.');
+      } else if (e.code == 'weak-password') {
+        throw Exception('Kata sandi terlalu lemah.');
+      } else {
+        throw Exception(e.message ?? 'Terjadi kesalahan saat pendaftaran.');
+      }
     } catch (e) {
       throw Exception(e.toString());
     }
@@ -60,6 +70,16 @@ class AuthService {
       }
       return await _auth.signInWithEmailAndPassword(
           email: email, password: password);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        throw Exception('Email atau password salah');
+      } else if (e.code == 'user-not-found') {
+        throw Exception('Pengguna tidak ditemukan');
+      } else if (e.code == 'invalid-email') {
+        throw Exception('Format email tidak valid.');
+      } else {
+        throw Exception(e.message ?? 'Terjadi kesalahan saat masuk');
+      }
     } catch (e) {
       throw Exception(e.toString());
     }

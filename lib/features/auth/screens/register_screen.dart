@@ -46,6 +46,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         throw Exception("Semua kolom wajib diisi");
       }
 
+      final email = _emailController.text.trim();
+      final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+      if (!emailRegex.hasMatch(email)) {
+        throw Exception("Format email tidak valid.");
+      }
+
       if (_passwordController.text != _confirmPasswordController.text) {
         throw Exception("Konfirmasi kata sandi tidak cocok!");
       }

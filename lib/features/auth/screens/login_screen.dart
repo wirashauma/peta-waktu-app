@@ -19,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  String? _loadingStatus;
 
   void _showError(String message) {
     if (!mounted) return;
@@ -40,7 +41,25 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    String email = _emailController.text.trim().toLowerCase();
+    String dashboardName = 'Dashboard Siswa';
+    if (email.contains('guru')) {
+      dashboardName = 'Dashboard Guru';
+    } else if (email.contains('admin')) {
+      dashboardName = 'Dashboard Admin';
+    }
+
+    setState(() {
+      _isLoading = true;
+      _loadingStatus = "Menghubungkan...";
+    });
+    await Future.delayed(const Duration(milliseconds: 600));
+
+    setState(() {
+      _loadingStatus = "Login berhasil, diarahkan ke $dashboardName.";
+    });
+    await Future.delayed(const Duration(milliseconds: 1000));
+
     try {
       await _authService.signIn(
         email: _emailController.text.trim(),
@@ -54,7 +73,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleGoogleLogin() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadingStatus = "Menghubungkan ke Google...";
+    });
     try {
       await GoogleSignIn().signOut();
       await _authService.signInWithGoogle();
@@ -71,10 +93,41 @@ class _LoginScreenState extends State<LoginScreen> {
     required String role,
     required String name,
   }) async {
-    setState(() => _isLoading = true);
+    String dashboardName = 'Dashboard Siswa';
+    if (role == 'guru') {
+      dashboardName = 'Dashboard Guru';
+    } else if (role == 'admin') {
+      dashboardName = 'Dashboard Admin';
+    }
+
+    setState(() {
+      _isLoading = true;
+      _loadingStatus = 'Menghubungkan...';
+    });
+    await Future.delayed(const Duration(milliseconds: 600));
+    
     try {
       // 1. Coba login terlebih dahulu
       await _authService.signIn(email: email, password: password);
+      
+      setState(() {
+        _loadingStatus = 'Login berhasil, diarahkan ke $dashboardName.';
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Login berhasil, diarahkan ke $dashboardName.',
+              style: GoogleFonts.poppins(fontSize: 12),
+            ),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      
+      await Future.delayed(const Duration(milliseconds: 1500));
     } catch (e) {
       // Jika error, kemungkinan besar user belum ada di Auth (belum di-seed)
       String errorMsg = e.toString().toLowerCase();
@@ -85,6 +138,11 @@ class _LoginScreenState extends State<LoginScreen> {
           errorMsg.contains('salah')) {
         // Buat akun baru secara otomatis (Seed Data)
         try {
+          setState(() {
+            _loadingStatus = 'Menyiapkan akun baru...';
+          });
+          await Future.delayed(const Duration(milliseconds: 800));
+
           await _authService.signUp(
             email: email,
             password: password,
@@ -94,11 +152,15 @@ class _LoginScreenState extends State<LoginScreen> {
             role: role,
           );
           
+          setState(() {
+            _loadingStatus = 'Login berhasil, diarahkan ke $dashboardName.';
+          });
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Akun $name berhasil disiapkan & masuk!',
+                  'Login berhasil, diarahkan ke $dashboardName.',
                   style: GoogleFonts.poppins(fontSize: 12),
                 ),
                 backgroundColor: Colors.green.shade700,
@@ -106,6 +168,8 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             );
           }
+
+          await Future.delayed(const Duration(milliseconds: 1500));
         } catch (signUpErr) {
           _showError("Gagal menyiapkan akun: $signUpErr");
         }
@@ -200,7 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
               label: 'Guru',
               color: Colors.orange.shade800,
               email: 'guru@petawaktu.com',
-              password: 'password123',
+              password: 'guru123',
               role: 'guru',
               name: 'Guru Sejarah',
             ),
@@ -293,7 +357,23 @@ class _LoginScreenState extends State<LoginScreen> {
               
               const SizedBox(height: 24),
               _isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 12),
+                        if (_loadingStatus != null)
+                          Text(
+                            _loadingStatus!,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              color: primaryColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
+                    )
                   : SizedBox(
                       width: double.infinity,
                       height: 56,

@@ -122,29 +122,32 @@ class _QuizPlayScreenState extends State<QuizPlayScreen> {
   }
 
   void _goToNextQuestion({bool isTimeOut = false}) {
-    _stopTimer();
-
-    if (isTimeOut) {
+    if (!isTimeOut) {
+      if (_selectedOptionIndex == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Silakan pilih satu jawaban.'),
+            duration: Duration(milliseconds: 1000),
+          ),
+        );
+        // Jangan hentikan timer (timer berlanjut)
+        return;
+      }
+      _userAnswers[_currentQuestionIndex] = _selectedOptionIndex!;
+    } else {
       _userAnswers[_currentQuestionIndex] = -1; 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Waktu habis! Lanjut ke soal berikutnya.'),
+            content: Text('Waktu habis!'),
             backgroundColor: Colors.orange,
             duration: Duration(milliseconds: 1000),
           ),
         );
       }
-    } else {
-      if (_selectedOptionIndex == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Silakan pilih satu jawaban.')),
-        );
-        _startTimer(); 
-        return;
-      }
-      _userAnswers[_currentQuestionIndex] = _selectedOptionIndex!;
     }
+
+    _stopTimer();
 
     bool isLastQuestion = _currentQuestionIndex == _questions.length - 1;
 
@@ -198,9 +201,6 @@ class _QuizPlayScreenState extends State<QuizPlayScreen> {
     );
   }
 
-  Future<bool> _onWillPop() async {
-    return false; 
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -226,10 +226,13 @@ class _QuizPlayScreenState extends State<QuizPlayScreen> {
 
     return PopScope(
       canPop: false, 
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Selesaikan kuis terlebih dahulu!')),
+          const SnackBar(
+            content: Text('Selesaikan kuis terlebih dahulu!'),
+            duration: Duration(milliseconds: 1000),
+          ),
         );
       },
       child: Scaffold(
