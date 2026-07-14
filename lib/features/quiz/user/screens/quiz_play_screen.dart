@@ -26,6 +26,7 @@ class QuizPlayScreen extends StatefulWidget {
 
 class _QuizPlayScreenState extends State<QuizPlayScreen> {
   bool _isLoading = true;
+  bool _isSubmitting = false;
   List<QuizQuestionModel> _questions = [];
   final Map<int, int> _userAnswers = {};
   int _currentQuestionIndex = 0;
@@ -162,8 +163,37 @@ class _QuizPlayScreenState extends State<QuizPlayScreen> {
     }
   }
 
+  void _showExitConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Keluar Kuis?'),
+        content: const Text('Apakah Anda yakin ingin keluar dari kuis? Seluruh jawaban dan kemajuan Anda pada kuis ini akan hilang.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx); // Tutup dialog
+              _stopTimer();
+              Navigator.of(context).pop(); // Keluar layar kuis
+            },
+            child: const Text('Keluar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _finishQuiz() async {
+    if (_isSubmitting) return;
     _stopTimer();
+    
+    setState(() {
+      _isSubmitting = true;
+    });
     
     int correctCount = 0;
     for (int i = 0; i < _questions.length; i++) {
@@ -188,6 +218,10 @@ class _QuizPlayScreenState extends State<QuizPlayScreen> {
     }
 
     if (!mounted) return;
+
+    setState(() {
+      _isSubmitting = false;
+    });
 
     Navigator.pushReplacement(
       context,
@@ -228,24 +262,25 @@ class _QuizPlayScreenState extends State<QuizPlayScreen> {
       canPop: false, 
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Selesaikan kuis terlebih dahulu!'),
-            duration: Duration(milliseconds: 1000),
-          ),
-        );
+        _showExitConfirmationDialog();
       },
       child: Scaffold(
         backgroundColor: scaffoldColor,
         appBar: AppBar(
           automaticallyImplyLeading: false, 
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => _showExitConfirmationDialog(),
+          ),
           title: Text(widget.quizTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           backgroundColor: primaryTeal,
           centerTitle: true,
           elevation: 0,
         ),
-        body: Column(
+        body: Stack(
           children: [
+            Column(
+              children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               decoration: const BoxDecoration(
@@ -387,7 +422,16 @@ class _QuizPlayScreenState extends State<QuizPlayScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
+        if (_isSubmitting)
+          Container(
+            color: Colors.black.withOpacity(0.4),
+            child: const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          ),
+      ],
+    ),
+  ),
+);
+}
 }

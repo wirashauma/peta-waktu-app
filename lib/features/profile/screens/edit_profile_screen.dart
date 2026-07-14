@@ -18,6 +18,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final ProfileService _profileService = ProfileService();
   final CloudinaryService _cloudinaryService = CloudinaryService();
   final ImagePicker _picker = ImagePicker();
+  final _formKey = GlobalKey<FormState>();
 
   bool _isUploadingImage = false;
   String? _localPhotoUrl;
@@ -39,15 +40,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _showConfirmationDialog() async {
-    print("FUNGSI POP-UP 1 DIPANGGIL!");
-
     return showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Simpan Perubahan'),
           content:
-              const Text('anda yakin ingin mengubah data profil  sebelumnya ?'),
+              const Text('Apakah Anda yakin ingin mengubah data profil Anda?'),
           actions: <Widget>[
             TextButton(
               child: const Text('Batal'),
@@ -75,7 +74,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Sukses'),
-          content: const Text('edit profil berhasil :)'),
+          content: const Text('Profil berhasil diperbarui.'),
           actions: <Widget>[
             TextButton(
               child: const Text('OK'),
@@ -93,16 +92,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
-    if (_namaController.text.isEmpty ||
-        _nisnController.text.isEmpty ||
-        _usernameController.text.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Nama, NISN, dan Username tidak boleh kosong!')),
-      );
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
@@ -110,12 +100,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       Map<String, dynamic> dataToUpdate = {
-        'nama': _namaController.text,
-        'nisn': _nisnController.text,
-        'username': _usernameController.text,
+        'nama': _namaController.text.trim(),
+        'nisn': _nisnController.text.trim(),
+        'username': _usernameController.text.trim(),
       };
 
-      // Jika user telah mengupload foto baru secara lokal, sertakan pada update
       if (_localPhotoUrl != null && _localPhotoUrl!.isNotEmpty) {
         dataToUpdate['photoUrl'] = _localPhotoUrl!;
       }
@@ -123,9 +112,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       await _profileService.updateUserData(widget.user.uid, dataToUpdate);
 
       UserModel updatedUser = widget.user.copyWith(
-        nama: _namaController.text,
-        nisn: _nisnController.text,
-        username: _usernameController.text,
+        nama: _namaController.text.trim(),
+        nisn: _nisnController.text.trim(),
+        username: _usernameController.text.trim(),
         photoUrl: _localPhotoUrl ?? widget.user.photoUrl,
       );
 
@@ -166,108 +155,147 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            // Modern editable avatar
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                CircleAvatar(
-                  radius: 60,
-                  backgroundColor: fieldColor,
-                  child: ClipOval(
-                    child: _localPhotoUrl != null
-                        ? Image.network(
-                            _localPhotoUrl!,
-                            width: 120,
-                            height: 120,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Image.asset(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              // Modern editable avatar
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 60,
+                    backgroundColor: fieldColor,
+                    child: ClipOval(
+                      child: _localPhotoUrl != null
+                          ? Image.network(
+                              _localPhotoUrl!,
+                              width: 120,
+                              height: 120,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Image.asset(
+                                'assets/images/profile_icon.png',
+                                width: 120,
+                                height: 120,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : Image.asset(
                               'assets/images/profile_icon.png',
                               width: 120,
                               height: 120,
                               fit: BoxFit.cover,
                             ),
-                          )
-                        : Image.asset(
-                            'assets/images/profile_icon.png',
-                            width: 120,
-                            height: 120,
-                            fit: BoxFit.cover,
-                          ),
+                    ),
                   ),
-                ),
-                Positioned(
-                  bottom: -6,
-                  right: -6,
-                  child: Material(
-                    color: Colors.transparent,
-                    elevation: 4,
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      onTap: _pickAndUploadImage,
-                      borderRadius: BorderRadius.circular(30),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: primaryColor,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                  Positioned(
+                    bottom: -6,
+                    right: -6,
+                    child: Material(
+                      color: Colors.transparent,
+                      elevation: 4,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        onTap: _pickAndUploadImage,
+                        borderRadius: BorderRadius.circular(30),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: primaryColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: _isUploadingImage
+                              ? const Padding(
+                                  padding: EdgeInsets.all(10.0),
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.camera_alt,
+                                  color: Colors.white, size: 20),
                         ),
-                        child: _isUploadingImage
-                            ? const Padding(
-                                padding: EdgeInsets.all(10.0),
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Icon(Icons.camera_alt,
-                                color: Colors.white, size: 20),
                       ),
                     ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 32),
+              TextFormField(
+                controller: _namaController,
+                decoration: const InputDecoration(labelText: 'Nama'),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Nama tidak boleh kosong';
+                  }
+                  if (val.trim().length < 3) {
+                    return 'Nama minimal terdiri dari 3 karakter';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                initialValue: widget.user.email,
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: 'Email (Tidak bisa diubah)',
                 ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            TextFormField(
-              controller: _namaController,
-              decoration: const InputDecoration(labelText: 'Nama'),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: TextEditingController(text: widget.user.email),
-              readOnly: true,
-              decoration: const InputDecoration(
-                labelText: 'Email (Tidak bisa diubah)',
+                style: TextStyle(color: textColor.withOpacity(0.7)),
               ),
-              style: TextStyle(color: textColor.withOpacity(0.7)),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _usernameController,
-              decoration: const InputDecoration(
-                labelText: 'Username',
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Username',
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Username tidak boleh kosong';
+                  }
+                  if (val.contains(' ')) {
+                    return 'Username tidak boleh menggunakan spasi';
+                  }
+                  if (RegExp(r'[!@#<>?":_`~;[\]\\|=+)(*&^-%$#@!]').hasMatch(val)) {
+                    return 'Username tidak boleh mengandung karakter spesial';
+                  }
+                  return null;
+                },
               ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _nisnController,
-              decoration: const InputDecoration(labelText: 'NISN'),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 32),
-            _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _showConfirmationDialog,
-                      child: const Text('Save'),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _nisnController,
+                decoration: const InputDecoration(labelText: 'NISN'),
+                keyboardType: TextInputType.number,
+                validator: (val) {
+                  if (widget.user.role == 'user') {
+                    if (val == null || val.trim().isEmpty || val.trim() == '-') {
+                      return 'NISN wajib diisi untuk siswa';
+                    }
+                    if (val.trim().length != 10 || int.tryParse(val.trim()) == null) {
+                      return 'NISN harus berupa 10 digit angka';
+                    }
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 32),
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (_formKey.currentState!.validate()) {
+                            _showConfirmationDialog();
+                          }
+                        },
+                        child: const Text('Save'),
+                      ),
                     ),
-                  ),
-          ],
+            ],
+          ),
         ),
       ),
     );

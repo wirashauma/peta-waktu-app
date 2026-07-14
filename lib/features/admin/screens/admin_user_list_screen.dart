@@ -56,8 +56,10 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text('User $nama berhasil dihapus.'),
-                backgroundColor: Colors.green),
+                content: Text('Profil $nama dihapus dari Firestore. Catatan: Hapus dari Firebase Console Auth untuk memblokir akses login sepenuhnya.'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 4),
+            ),
           );
         }
       } catch (e) {
@@ -92,6 +94,13 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
   Widget build(BuildContext context) {
     final currentAdminUid = FirebaseAuth.instance.currentUser?.uid;
 
+    // Batasi & filter query di server untuk efisiensi biaya/performa read Firestore
+    Query query = FirebaseFirestore.instance.collection('users');
+    if (_selectedRoleFilter != 'All') {
+      query = query.where('role', isEqualTo: _selectedRoleFilter);
+    }
+    query = query.limit(50); // limit 50 untuk mencegah pemuatan massal data
+
     return Scaffold(
       backgroundColor: scaffoldColor,
       body: Column(
@@ -99,8 +108,7 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
           _buildHeader(),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream:
-                  FirebaseFirestore.instance.collection('users').snapshots(),
+              stream: query.snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(

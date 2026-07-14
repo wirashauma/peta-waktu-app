@@ -240,17 +240,38 @@ class _QuizResultScreenState extends State<QuizResultScreen> {
 
   Widget _buildStatItem(
       IconData icon, String label, String value, Color color) {
-    Color itemColor =
-        (color == Colors.white) ? Colors.white.withOpacity(0.9) : Colors.white;
-    return Column(
-      children: [
-        Icon(icon, color: itemColor, size: 28),
-        const SizedBox(height: 4),
-        Text(value,
+    Color targetColor = (color == Colors.white) ? Colors.white : color;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: targetColor, size: 28),
+          const SizedBox(height: 6),
+          Text(
+            value,
             style: TextStyle(
-                fontSize: 20, fontWeight: FontWeight.bold, color: itemColor)),
-        Text(label, style: TextStyle(fontSize: 12, color: itemColor)),
-      ],
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: targetColor,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withOpacity(0.85),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

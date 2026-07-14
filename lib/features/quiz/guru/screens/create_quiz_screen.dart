@@ -82,6 +82,20 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    _quizTitleController.dispose();
+    for (var model in _questions) {
+      model.questionController.dispose();
+      model.explanationController.dispose();
+      model.optionAController.dispose();
+      model.optionBController.dispose();
+      model.optionCController.dispose();
+      model.optionDController.dispose();
+    }
+    super.dispose();
+  }
+
   Future<void> _showAiDialog() async {
     final topicController = TextEditingController();
 
@@ -135,9 +149,20 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
           _quizTitleController.text = "Kuis: $topic";
         }
 
-        for (int i = 0; i < 10 && i < generatedData.length; i++) {
+        // Hancurkan controller yang lama sebelum dikosongkan untuk mencegah memory leak
+        for (var model in _questions) {
+          model.questionController.dispose();
+          model.explanationController.dispose();
+          model.optionAController.dispose();
+          model.optionBController.dispose();
+          model.optionCController.dispose();
+          model.optionDController.dispose();
+        }
+
+        _questions.clear();
+        for (int i = 0; i < generatedData.length; i++) {
           final data = generatedData[i];
-          final model = _questions[i];
+          final model = QuestionFormModel();
 
           model.questionController.text = data['questionText'] ?? '';
           model.explanationController.text = data['explanation'] ?? '';
@@ -154,6 +179,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
 
           model.correctAnswerIndex = data['correctAnswerIndex'] ?? 0;
           model.timeLimitSeconds = data['timeLimit'] ?? 30;
+          _questions.add(model);
         }
       });
 
@@ -190,12 +216,21 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
       final questionsSnapshot =
           await widget.quizToEdit!.reference.collection('questions').get();
 
-      for (int i = 0; i < questionsSnapshot.docs.length; i++) {
-        if (i >= 10) break;
+      // Hancurkan controller lama
+      for (var model in _questions) {
+        model.questionController.dispose();
+        model.explanationController.dispose();
+        model.optionAController.dispose();
+        model.optionBController.dispose();
+        model.optionCController.dispose();
+        model.optionDController.dispose();
+      }
 
+      _questions.clear();
+      for (int i = 0; i < questionsSnapshot.docs.length; i++) {
         var questionDoc = questionsSnapshot.docs[i];
         var questionData = questionDoc.data();
-        var model = _questions[i];
+        var model = QuestionFormModel();
 
         model.questionId = questionDoc.id;
         model.questionController.text = questionData['questionText'] ?? '';
@@ -210,6 +245,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
             (questionData['options'] as List)[3] ?? '';
         model.correctAnswerIndex = questionData['correctAnswerIndex'] ?? 0;
         model.timeLimitSeconds = questionData['timeLimit'] ?? 30;
+        _questions.add(model);
       }
     } catch (e) {
       if (mounted) {
@@ -240,11 +276,17 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
         await quizDoc.update({
           'title': _quizTitleController.text,
           'timePeriod': _selectedPeriod,
+          'questionCount': _questions.length,
         });
+
+        // 1. Dapatkan daftar pertanyaan yang ada di Firestore saat ini
+        var existingQuestionsSnapshot = await quizDoc.collection('questions').get();
+        var existingDocIds = existingQuestionsSnapshot.docs.map((doc) => doc.id).toSet();
 
         WriteBatch batch = FirebaseFirestore.instance.batch();
         for (var questionForm in _questions) {
           if (questionForm.questionId != null) {
+            existingDocIds.remove(questionForm.questionId);
             var questionRef =
                 quizDoc.collection('questions').doc(questionForm.questionId);
             batch.update(questionRef, {
@@ -259,8 +301,30 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
               'correctAnswerIndex': questionForm.correctAnswerIndex,
               'timeLimit': questionForm.timeLimitSeconds,
             });
+          } else {
+            // Soal baru yang ditambahkan guru
+            var questionRef = quizDoc.collection('questions').doc();
+            batch.set(questionRef, {
+              'questionText': questionForm.questionController.text,
+              'explanation': questionForm.explanationController.text,
+              'options': [
+                questionForm.optionAController.text,
+                questionForm.optionBController.text,
+                questionForm.optionCController.text,
+                questionForm.optionDController.text,
+              ],
+              'correctAnswerIndex': questionForm.correctAnswerIndex,
+              'timeLimit': questionForm.timeLimitSeconds,
+            });
           }
         }
+
+        // 2. Hapus pertanyaan di Firestore yang sudah dihapus dari UI kuis oleh guru
+        for (var deletedId in existingDocIds) {
+          var questionRef = quizDoc.collection('questions').doc(deletedId);
+          batch.delete(questionRef);
+        }
+
         await batch.commit();
 
         if (mounted) {
@@ -274,7 +338,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
             await FirebaseFirestore.instance.collection('quizzes').add({
           'title': _quizTitleController.text,
           'timePeriod': _selectedPeriod,
-          'questionCount': 10,
+          'questionCount': _questions.length,
           'createdAt': FieldValue.serverTimestamp(),
         });
 
@@ -402,12 +466,30 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                   },
                 ),
                 const Divider(height: 40, color: primaryTeal),
-                const Text('Detail Pertanyaan (10 Soal)',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: primaryTeal)),
-                ...List.generate(10, (index) {
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Detail Pertanyaan (${_questions.length} Soal)',
+                        style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: primaryTeal)),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _questions.add(QuestionFormModel());
+                        });
+                      },
+                      icon: const Icon(Icons.add, size: 16, color: Colors.white),
+                      label: const Text("Tambah Soal", style: TextStyle(fontSize: 12, color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryTeal,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                  ],
+                ),
+                ...List.generate(_questions.length, (index) {
                   return _buildQuestionEditor(index + 1, _questions[index]);
                 }),
                 const SizedBox(height: 24),
@@ -489,11 +571,35 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Soal $questionNumber',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: primaryTeal)),
+                  Row(
+                    children: [
+                      Text('Soal $questionNumber',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: primaryTeal)),
+                      if (_questions.length > 1) ...[
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                          onPressed: () {
+                            setState(() {
+                              _questions.remove(model);
+                              model.questionController.dispose();
+                              model.explanationController.dispose();
+                              model.optionAController.dispose();
+                              model.optionBController.dispose();
+                              model.optionCController.dispose();
+                              model.optionDController.dispose();
+                            });
+                          },
+                          constraints: const BoxConstraints(),
+                          padding: EdgeInsets.zero,
+                          tooltip: "Hapus Soal",
+                        ),
+                      ],
+                    ],
+                  ),
                   SizedBox(
                     width: 140,
                     child: DropdownButtonFormField<int>(

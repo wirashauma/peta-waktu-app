@@ -33,6 +33,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _userRole = 'user';
   UserModel? _currentUser;
   int _currentIndex = 0;
+  bool _isRoleLoading = true;
 
   @override
   void initState() {
@@ -43,9 +44,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _fetchUserRole() async {
     UserModel? user = await _userService.fetchCurrentUser();
-    if (user != null && mounted) {
+    if (mounted) {
       setState(() {
-        _userRole = user.role;
+        if (user != null) {
+          _userRole = user.role;
+          _currentUser = user;
+        }
+        _isRoleLoading = false;
       });
     }
   }
@@ -142,6 +147,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isRoleLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(color: primaryTeal),
+        ),
+      );
+    }
+
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
     final toolbarHeight = (screenHeight * 0.07).clamp(48.0, 64.0);

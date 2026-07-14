@@ -1,11 +1,12 @@
 import 'dart:io';
 
 import 'package:cloudinary_public/cloudinary_public.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class CloudinaryService {
   final CloudinaryPublic _cloudinary = CloudinaryPublic(
-    'dzsr1xfvm', // cloud name
-    'peta_waktu_preset', // unsigned upload preset
+    dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? 'dzsr1xfvm', // cloud name
+    dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? 'peta_waktu_preset', // unsigned upload preset
     cache: false,
   );
 
