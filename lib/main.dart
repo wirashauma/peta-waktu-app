@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
 import 'features/auth/screens/splash_screen.dart';
+import 'features/auth/services/auth_service.dart';
 
 // --- TEMA WARNA BARU (Teal & Abu-abu Profesional) ---
 const Color primaryTeal = Color(0xFF00796B); // Teal Dark (Warna Aksen Utama)
@@ -24,6 +25,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Inisialisasi pendengar status autentikasi mock/gabungan
+  AuthService.initialize();
+
   runApp(const MyApp());
 }
 

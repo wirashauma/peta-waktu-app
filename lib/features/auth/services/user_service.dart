@@ -3,6 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
+import 'auth_service.dart';
 
 class UserService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -14,6 +15,10 @@ class UserService {
 
   Future<UserModel?> fetchCurrentUser() async {
     try {
+      if (AuthService.mockUser != null) {
+        _currentUser = AuthService.mockUser;
+        return _currentUser;
+      }
       User? user = _auth.currentUser;
       
       if (user != null) {

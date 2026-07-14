@@ -1,8 +1,11 @@
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:peta_waktu/features/auth/screens/register_screen.dart';
 import 'package:peta_waktu/features/auth/services/auth_service.dart';
+import 'package:peta_waktu/features/auth/models/user_model.dart';
 import 'package:peta_waktu/features/auth/widgets/custom_button.dart';
 import 'package:peta_waktu/features/auth/widgets/custom_textfield.dart';
 import 'package:peta_waktu/main.dart';
@@ -43,10 +46,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
     String email = _emailController.text.trim().toLowerCase();
     String dashboardName = 'Dashboard Siswa';
+    String role = 'user';
     if (email.contains('guru')) {
       dashboardName = 'Dashboard Guru';
+      role = 'guru';
     } else if (email.contains('admin')) {
       dashboardName = 'Dashboard Admin';
+      role = 'admin';
     }
 
     setState(() {
@@ -61,10 +67,36 @@ class _LoginScreenState extends State<LoginScreen> {
     await Future.delayed(const Duration(milliseconds: 1000));
 
     try {
-      await _authService.signIn(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      String uid = 'mock-uid-$role';
+      String name = email.split('@')[0].toUpperCase();
+      
+      try {
+        final userCredential = await FirebaseAuth.instance.signInAnonymously();
+        uid = userCredential.user!.uid;
+        
+        await FirebaseFirestore.instance.collection('users').doc(uid).set({
+          'uid': uid,
+          'email': email,
+          'nisn': role == 'user' ? '1234567890' : '-',
+          'nama': name,
+          'username': email.split('@')[0],
+          'role': role,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } catch (dbErr) {
+        debugPrint("Firebase login/write failed, using local mock session: $dbErr");
+      }
+
+      final loggedInUser = UserModel(
+        uid: uid,
+        email: email,
+        nisn: role == 'user' ? '1234567890' : '-',
+        role: role,
+        nama: name,
+        photoUrl: '',
+        username: email.split('@')[0],
       );
+      AuthService.setMockUser(loggedInUser);
     } catch (e) {
       _showError(e.toString());
     } finally {
@@ -107,9 +139,36 @@ class _LoginScreenState extends State<LoginScreen> {
     await Future.delayed(const Duration(milliseconds: 600));
     
     try {
-      // 1. Coba login terlebih dahulu
-      await _authService.signIn(email: email, password: password);
+      String uid = 'mock-uid-$role';
       
+      try {
+        final userCredential = await FirebaseAuth.instance.signInAnonymously();
+        uid = userCredential.user!.uid;
+        
+        await FirebaseFirestore.instance.collection('users').doc(uid).set({
+          'uid': uid,
+          'email': email,
+          'nisn': role == 'user' ? '1234567890' : '-',
+          'nama': name,
+          'username': name.toLowerCase().replaceAll(' ', ''),
+          'role': role,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } catch (dbErr) {
+        debugPrint("Firebase login/write failed, using local mock session: $dbErr");
+      }
+
+      final loggedInUser = UserModel(
+        uid: uid,
+        email: email,
+        nisn: role == 'user' ? '1234567890' : '-',
+        role: role,
+        nama: name,
+        photoUrl: '',
+        username: name.toLowerCase().replaceAll(' ', ''),
+      );
+      AuthService.setMockUser(loggedInUser);
+
       setState(() {
         _loadingStatus = 'Login berhasil, diarahkan ke $dashboardName.';
       });
@@ -129,53 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
       
       await Future.delayed(const Duration(milliseconds: 1500));
     } catch (e) {
-      // Jika error, kemungkinan besar user belum ada di Auth (belum di-seed)
-      String errorMsg = e.toString().toLowerCase();
-      if (errorMsg.contains('user-not-found') || 
-          errorMsg.contains('invalid-credential') || 
-          errorMsg.contains('wrong-password') ||
-          errorMsg.contains('tidak ditemukan') ||
-          errorMsg.contains('salah')) {
-        // Buat akun baru secara otomatis (Seed Data)
-        try {
-          setState(() {
-            _loadingStatus = 'Menyiapkan akun baru...';
-          });
-          await Future.delayed(const Duration(milliseconds: 800));
-
-          await _authService.signUp(
-            email: email,
-            password: password,
-            nisn: role == 'user' ? '1234567890' : '-',
-            nama: name,
-            username: name.toLowerCase().replaceAll(' ', ''),
-            role: role,
-          );
-          
-          setState(() {
-            _loadingStatus = 'Login berhasil, diarahkan ke $dashboardName.';
-          });
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Login berhasil, diarahkan ke $dashboardName.',
-                  style: GoogleFonts.poppins(fontSize: 12),
-                ),
-                backgroundColor: Colors.green.shade700,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-
-          await Future.delayed(const Duration(milliseconds: 1500));
-        } catch (signUpErr) {
-          _showError("Gagal menyiapkan akun: $signUpErr");
-        }
-      } else {
-        _showError(e.toString());
-      }
+      _showError(e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

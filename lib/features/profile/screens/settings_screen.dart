@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:peta_waktu/features/auth/models/user_model.dart';
+import 'package:peta_waktu/features/auth/services/auth_service.dart';
 import 'package:peta_waktu/main.dart';
 import 'profile_screen.dart';
 import 'change_password_screen.dart';
@@ -362,6 +363,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onPressed: () async {
                     Navigator.pop(ctx);
                     await FirebaseAuth.instance.signOut();
+                    AuthService.setMockUser(null);
                     if (context.mounted) {
                       Navigator.of(context).popUntil((route) => route.isFirst);
                     }

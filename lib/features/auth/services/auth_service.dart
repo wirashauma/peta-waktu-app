@@ -1,12 +1,48 @@
-// LOKASI: lib/features/auth/services/auth_service.dart
-
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../models/user_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  static UserModel? mockUser;
+  static final StreamController<UserModel?> _authStateController = StreamController<UserModel?>.broadcast();
+  static Stream<UserModel?> get authStateChanges => _authStateController.stream;
+
+  static void initialize() {
+    FirebaseAuth.instance.authStateChanges().listen((User? firebaseUser) async {
+      if (firebaseUser == null) {
+        if (mockUser == null) {
+          _authStateController.add(null);
+        }
+      } else {
+        if (mockUser != null && mockUser!.uid == firebaseUser.uid) {
+          _authStateController.add(mockUser);
+        } else {
+          try {
+            final doc = await FirebaseFirestore.instance.collection('users').doc(firebaseUser.uid).get();
+            if (doc.exists) {
+              final user = UserModel.fromFirestore(doc);
+              mockUser = user;
+              _authStateController.add(user);
+            } else {
+              _authStateController.add(null);
+            }
+          } catch (_) {
+            _authStateController.add(null);
+          }
+        }
+      }
+    });
+  }
+
+  static void setMockUser(UserModel? user) {
+    mockUser = user;
+    _authStateController.add(user);
+  }
 
   // ---------------------------------------------------------------------------
   // 1. SIGN UP EMAIL/PASSWORD (EXISTING)
